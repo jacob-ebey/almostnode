@@ -160,6 +160,47 @@ describe('Running .jsx/.tsx files through the runtime', () => {
     expect(exports.children[0].type).toBe('li');
   });
 
+  it('lets a .ts file import a .ts module by its .js extension', () => {
+    vfs.writeFileSync('/util.ts', `export const n: number = 41;`);
+    vfs.writeFileSync(
+      '/main.ts',
+      `import { n } from './util.js';
+       module.exports = n + 1;`
+    );
+    const { exports } = runtime.runFile('/main.ts') as { exports: any };
+    expect(exports).toBe(42);
+  });
+
+  it('lets a .ts file import a .tsx module by its .jsx extension', () => {
+    vfs.writeFileSync('/Card.tsx', `export const Card = () => <div>hi</div>;`);
+    vfs.writeFileSync(
+      '/main.ts',
+      `import { Card } from './Card.jsx';
+       module.exports = Card();`
+    );
+    const { exports } = runtime.runFile('/main.ts') as { exports: any };
+    expect(exports.type).toBe('div');
+  });
+
+  it('lets a plain .js file require a .ts module via its .js extension', () => {
+    vfs.writeFileSync('/lib.ts', `export const greet = (s: string): string => 'hi ' + s;`);
+    vfs.writeFileSync(
+      '/main.js',
+      `const { greet } = require('./lib.js');
+       module.exports = greet('ts');`
+    );
+    const { exports } = runtime.runFile('/main.js') as { exports: any };
+    expect(exports).toBe('hi ts');
+  });
+
+  it('prefers a real .js sibling over the rewritten .ts', () => {
+    vfs.writeFileSync('/dep.js', `module.exports = 'from-js';`);
+    vfs.writeFileSync('/dep.ts', `module.exports = 'from-ts';`);
+    vfs.writeFileSync('/main.ts', `module.exports = require('./dep.js');`);
+    const { exports } = runtime.runFile('/main.ts') as { exports: any };
+    expect(exports).toBe('from-js');
+  });
+
   it('resolves require() of a .tsx file without extension', () => {
     vfs.writeFileSync(
       '/components/Card.tsx',

@@ -425,6 +425,28 @@ const builtinModules: Record<string, unknown> = {
 };
 
 /**
+ * TypeScript-style import extension rewriting.
+ *
+ * TS/ESM code commonly imports a sibling module by its *output* extension
+ * (`import './foo.js'`) even though the source on disk is `./foo.ts` / `.tsx`.
+ * When the literal extension doesn't exist, map it to the TypeScript source
+ * extensions and try those, matching `tsc`/`tsx`/Node's `--experimental` rules.
+ */
+const TS_EXT_REWRITES: Record<string, string[]> = {
+  '.js': ['.ts', '.tsx'],
+  '.jsx': ['.tsx'],
+  '.mjs': ['.mts'],
+  '.cjs': ['.cts'],
+};
+
+function tsExtensionCandidates(p: string): string[] {
+  const m = p.match(/(\.(?:js|jsx|mjs|cjs))$/);
+  if (!m) return [];
+  const base = p.slice(0, -m[1].length);
+  return (TS_EXT_REWRITES[m[1]] ?? []).map(ext => base + ext);
+}
+
+/**
  * Create a require function for a specific module context
  */
 function createRequire(
@@ -523,6 +545,15 @@ function createRequire(
         }
       }
 
+      // Rewrite a JS-style extension to its TypeScript source (e.g.
+      // `./foo.js` -> `./foo.ts`/`.tsx`) when the literal file is absent.
+      for (const candidate of tsExtensionCandidates(resolved)) {
+        if (vfs.existsSync(candidate)) {
+          resolutionCache.set(cacheKey, candidate);
+          return candidate;
+        }
+      }
+
       // Try with extensions
       const extensions = ['.js', '.json', ...TS_RESOLVE_EXTENSIONS, ...JSX_RESOLVE_EXTENSIONS];
       for (const ext of extensions) {
@@ -551,6 +582,14 @@ function createRequire(
           if (vfs.existsSync(indexPath)) {
             return indexPath;
           }
+        }
+      }
+
+      // Rewrite a JS-style extension to its TypeScript source (e.g.
+      // `./foo.js` -> `./foo.ts`/`.tsx`) when the literal file is absent.
+      for (const candidate of tsExtensionCandidates(basePath)) {
+        if (vfs.existsSync(candidate)) {
+          return candidate;
         }
       }
 

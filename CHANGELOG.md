@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented with `acorn-jsx` (already a dependency) — a small, synchronous, pure-JS codegen pass, no Babel/esbuild and no wasm, keeping the bundle lean.
   - The transform is **config-driven**: the nearest `tsconfig.json` or `jsconfig.json` in the VFS is resolved by walking upward from the script being transformed. `jsx` (`react` → classic `React.createElement`; `react-jsx`/`react-jsxdev` → automatic `react/jsx-runtime`), `jsxImportSource`, `jsxFactory`, and `jsxFragmentFactory` are all honored. Defaults to the automatic runtime with `react` when no config is found.
   - Handles intrinsic vs. component tags, member-expression components (`<Foo.Bar/>`), fragments, spread attributes/children, boolean attribute shorthand, `key` extraction (automatic runtime), nested JSX inside expressions, JSX whitespace collapsing, and HTML entity decoding.
+- **TypeScript import extension rewriting**: imports/requires that reference a sibling by its *output* extension (`import './foo.js'`, `require('./Card.jsx')`) now resolve to the TypeScript source on disk (`.ts`/`.tsx`/`.mts`/`.cts`) when the literal file is absent — matching `tsc`/Node behavior. A real `.js` sibling still wins over the rewritten `.ts`. Works from both `.js` and `.ts`/`.tsx` files.
+
+### Fixed
+- **Named exports now preserve their local binding** in the ESM→CJS transform. `export const`/`function`/`class` declarations previously became `exports.X = ...` outright, dropping the local `X` binding so later module-scope references broke (e.g. `export const o = {}; o.key = 'v'` produced invalid `exports.o = {}; o.key = 'v'`). The declaration is now kept and the value is assigned onto `exports` separately. Destructuring exports (`export const { a, b } = obj`, `export const [x] = arr`) export each bound name.
 
 ## [0.3.0] - 2026-06-01
 

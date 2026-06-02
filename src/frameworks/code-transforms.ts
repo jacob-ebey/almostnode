@@ -353,6 +353,36 @@ export function transformEsmToCjsSimple(code: string): string {
   }
 }
 
+/**
+ * Collect the bound identifier names from a binding target, supporting
+ * destructuring (object/array patterns, defaults, rest). Used so that
+ * `export const { a, b } = obj` / `export const [x] = arr` export each name.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function collectPatternNames(node: any, out: string[]): void {
+  if (!node) return;
+  switch (node.type) {
+    case 'Identifier':
+      out.push(node.name);
+      break;
+    case 'ObjectPattern':
+      for (const prop of node.properties) {
+        if (prop.type === 'RestElement') collectPatternNames(prop.argument, out);
+        else collectPatternNames(prop.value, out);
+      }
+      break;
+    case 'ArrayPattern':
+      for (const el of node.elements) collectPatternNames(el, out);
+      break;
+    case 'AssignmentPattern':
+      collectPatternNames(node.left, out);
+      break;
+    case 'RestElement':
+      collectPatternNames(node.argument, out);
+      break;
+  }
+}
+
 /** AST-based ESM→CJS transform using acorn. */
 function transformEsmToCjsAst(code: string): string {
   const ast = acorn.parse(code, { ecmaVersion: 'latest', sourceType: 'module' });
@@ -412,23 +442,22 @@ function transformEsmToCjsAst(code: string): string {
     } else if (node.type === 'ExportNamedDeclaration') {
       if (node.declaration) {
         const decl = node.declaration;
-        if (decl.type === 'FunctionDeclaration') {
+        // Keep the original declaration (preserving the local binding so later
+        // code can still reference/mutate it), then assign it onto `exports`.
+        // Replacing the declaration outright with `exports.X = ...` would drop
+        // the local binding and break e.g. `export const o = {}; o.k = 1;`.
+        const declCode = code.slice(decl.start, decl.end);
+        if (decl.type === 'FunctionDeclaration' || decl.type === 'ClassDeclaration') {
           const name = decl.id.name;
-          const funcCode = code.slice(decl.start, node.end);
-          replacements.push([node.start, node.end, `exports.${name} = ${funcCode}`]);
-        } else if (decl.type === 'ClassDeclaration') {
-          const name = decl.id.name;
-          const classCode = code.slice(decl.start, node.end);
-          replacements.push([node.start, node.end, `exports.${name} = ${classCode}`]);
+          replacements.push([node.start, node.end, `${declCode}\nexports.${name} = ${name};`]);
         } else if (decl.type === 'VariableDeclaration') {
-          // export const X = ..., export let Y = ...
-          const parts: string[] = [];
+          // export const X = ..., export let Y = ..., export const { a, b } = ...
+          const names: string[] = [];
           for (const declarator of decl.declarations) {
-            const name = declarator.id.name;
-            const initCode = declarator.init ? code.slice(declarator.init.start, declarator.init.end) : 'undefined';
-            parts.push(`exports.${name} = ${initCode}`);
+            collectPatternNames(declarator.id, names);
           }
-          replacements.push([node.start, node.end, parts.join(';\n')]);
+          const assigns = names.map(n => `exports.${n} = ${n};`).join('\n');
+          replacements.push([node.start, node.end, `${declCode}\n${assigns}`]);
         }
       } else if (node.source) {
         // Re-export: export { X } from './module'
