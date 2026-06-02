@@ -826,6 +826,9 @@ var process = $process;
 var console = $console;
 var import_meta = $importMeta;
 var __dynamicImport = $dynamicImport;
+// Node.js code runs without a DOM — shadow browser globals as undefined
+var document = undefined;
+var window = undefined;
 // Set up global.process and globalThis.process for code that accesses them directly
 var global = globalThis;
 globalThis.process = $process;
@@ -1377,6 +1380,9 @@ var process = $process;
 var console = $console;
 var import_meta = $importMeta;
 var __dynamicImport = $dynamicImport;
+// Node.js code runs without a DOM — shadow browser globals as undefined
+var document = undefined;
+var window = undefined;
 // Set up global.process and globalThis.process for code that accesses them directly
 var global = globalThis;
 globalThis.process = $process;
