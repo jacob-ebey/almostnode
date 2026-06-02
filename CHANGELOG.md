@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-06-01
+
+### Added
+- **JSX/TSX support**: `.jsx` and `.tsx` files now run directly through the runtime. `.tsx` is type-stripped first (the existing TS pass) and then JSX is compiled to factory calls; `.jsx` goes straight through the JSX pass. `node app.tsx`, `require('./Component.tsx')`, and `index.tsx`/`index.jsx` directory resolution all work.
+  - Implemented with `acorn-jsx` (already a dependency) — a small, synchronous, pure-JS codegen pass, no Babel/esbuild and no wasm, keeping the bundle lean.
+  - The transform is **config-driven**: the nearest `tsconfig.json` or `jsconfig.json` in the VFS is resolved by walking upward from the script being transformed. `jsx` (`react` → classic `React.createElement`; `react-jsx`/`react-jsxdev` → automatic `react/jsx-runtime`), `jsxImportSource`, `jsxFactory`, and `jsxFragmentFactory` are all honored. Defaults to the automatic runtime with `react` when no config is found.
+  - Handles intrinsic vs. component tags, member-expression components (`<Foo.Bar/>`), fragments, spread attributes/children, boolean attribute shorthand, `key` extraction (automatic runtime), nested JSX inside expressions, JSX whitespace collapsing, and HTML entity decoding.
+
 ## [0.3.0] - 2026-06-01
 
 ### Added

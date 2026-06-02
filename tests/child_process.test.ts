@@ -170,6 +170,31 @@ exec('node /main', (error, stdout) => {
 
       expect(consoleOutput.some(o => o.includes('answer:42'))).toBe(true);
     });
+
+    it('should run a .tsx file via `node`', async () => {
+      vfs.writeFileSync(
+        '/node_modules/react/jsx-runtime.js',
+        `exports.Fragment = 'Fragment';
+         exports.jsx = exports.jsxs = (type, props) => ({ type, text: props.children });`
+      );
+      vfs.writeFileSync(
+        '/view.tsx',
+        `const label: string = 'rendered';
+         const el = <h1>{label}</h1>;
+         console.log('tag:' + el.type + ' text:' + el.text);`
+      );
+
+      const code = `
+const { exec } = require('child_process');
+exec('node /view.tsx', (error, stdout) => {
+  console.log('out:', stdout.trim());
+});
+      `;
+      runtime.execute(code, '/test.js');
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      expect(consoleOutput.some(o => o.includes('tag:h1 text:rendered'))).toBe(true);
+    });
   });
 
   describe('shell features', () => {

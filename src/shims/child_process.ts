@@ -132,8 +132,8 @@ export function initChildProcess(vfs: VirtualFS): void {
     let resolvedPath = basePath;
     if (!currentVfs.existsSync(resolvedPath) || currentVfs.statSync(resolvedPath).isDirectory()) {
       const candidates = [
-        ...['.js', '.cjs', '.mjs', '.ts', '.mts', '.cts'].map(ext => basePath + ext),
-        ...['index.js', 'index.ts', 'index.mts', 'index.cts'].map(
+        ...['.js', '.cjs', '.mjs', '.ts', '.mts', '.cts', '.tsx', '.jsx'].map(ext => basePath + ext),
+        ...['index.js', 'index.ts', 'index.mts', 'index.cts', 'index.tsx', 'index.jsx'].map(
           name => `${basePath}/${name}`.replace(/\/+/g, '/')
         ),
       ];

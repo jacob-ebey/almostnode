@@ -60,6 +60,8 @@ import {
   stripTypeScriptTypes,
   TS_RESOLVE_EXTENSIONS,
 } from './frameworks/strip-types';
+import { isJsxFile, transformJsx, JSX_RESOLVE_EXTENSIONS } from './frameworks/jsx-transform';
+import { resolveJsxConfig } from './frameworks/jsx-config';
 import * as acorn from 'acorn';
 
 /**
@@ -511,8 +513,8 @@ function createRequire(
           resolutionCache.set(cacheKey, resolved);
           return resolved;
         }
-        // Directory - look for index.{js,json,ts,...}
-        for (const indexExt of ['.js', '.json', ...TS_RESOLVE_EXTENSIONS]) {
+        // Directory - look for index.{js,json,ts,tsx,...}
+        for (const indexExt of ['.js', '.json', ...TS_RESOLVE_EXTENSIONS, ...JSX_RESOLVE_EXTENSIONS]) {
           const indexPath = pathShim.join(resolved, 'index' + indexExt);
           if (vfs.existsSync(indexPath)) {
             resolutionCache.set(cacheKey, indexPath);
@@ -522,7 +524,7 @@ function createRequire(
       }
 
       // Try with extensions
-      const extensions = ['.js', '.json', ...TS_RESOLVE_EXTENSIONS];
+      const extensions = ['.js', '.json', ...TS_RESOLVE_EXTENSIONS, ...JSX_RESOLVE_EXTENSIONS];
       for (const ext of extensions) {
         const withExt = resolved + ext;
         if (vfs.existsSync(withExt)) {
@@ -543,8 +545,8 @@ function createRequire(
         if (stats.isFile()) {
           return basePath;
         }
-        // Directory - look for index.{js,json,ts,...}
-        for (const indexExt of ['.js', '.json', ...TS_RESOLVE_EXTENSIONS]) {
+        // Directory - look for index.{js,json,ts,tsx,...}
+        for (const indexExt of ['.js', '.json', ...TS_RESOLVE_EXTENSIONS, ...JSX_RESOLVE_EXTENSIONS]) {
           const indexPath = pathShim.join(basePath, 'index' + indexExt);
           if (vfs.existsSync(indexPath)) {
             return indexPath;
@@ -553,7 +555,7 @@ function createRequire(
       }
 
       // Try with extensions
-      const extensions = ['.js', '.json', '.node', ...TS_RESOLVE_EXTENSIONS];
+      const extensions = ['.js', '.json', '.node', ...TS_RESOLVE_EXTENSIONS, ...JSX_RESOLVE_EXTENSIONS];
       for (const ext of extensions) {
         const withExt = basePath + ext;
         if (vfs.existsSync(withExt)) {
@@ -730,9 +732,15 @@ function createRequire(
       }
 
       // Strip TypeScript types first (mirrors Node's native .ts support).
-      // Whitespace-preserving, so the result still parses as plain JS.
-      if (isTypeScriptFile(resolvedPath)) {
+      // Whitespace-preserving, so the result still parses as plain JS. .tsx
+      // also goes through here so its TS syntax is removed before the JSX pass.
+      if (isTypeScriptFile(resolvedPath) || resolvedPath.endsWith('.tsx')) {
         code = stripTypeScriptTypes(code, resolvedPath);
+      }
+
+      // Transform JSX (.jsx/.tsx) using the nearest tsconfig/jsconfig config.
+      if (isJsxFile(resolvedPath)) {
+        code = transformJsx(code, resolveJsxConfig(vfs, resolvedPath));
       }
 
       // Transform ESM to CJS if needed (for .mjs files or ESM that wasn't pre-transformed)
@@ -1300,8 +1308,14 @@ export class Runtime {
     }
 
     // Strip TypeScript types first (mirrors Node's native .ts support).
-    if (isTypeScriptFile(filename)) {
+    // .tsx also passes through here to remove TS syntax before the JSX pass.
+    if (isTypeScriptFile(filename) || filename.endsWith('.tsx')) {
       code = stripTypeScriptTypes(code, filename);
+    }
+
+    // Transform JSX (.jsx/.tsx) using the nearest tsconfig/jsconfig config.
+    if (isJsxFile(filename)) {
+      code = transformJsx(code, resolveJsxConfig(this.vfs, filename));
     }
 
     // Transform ESM to CJS if needed (AST-based, handles import.meta and dynamic imports too)
