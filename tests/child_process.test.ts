@@ -135,6 +135,43 @@ child.on('exit', (code) => {
     });
   });
 
+  describe('node command with TypeScript', () => {
+    it('should run a .ts file via `node`', async () => {
+      vfs.writeFileSync(
+        '/script.ts',
+        `const msg: string = 'typed hello';
+         function shout(s: string): string { return s.toUpperCase(); }
+         console.log(shout(msg));`
+      );
+
+      const code = `
+const { exec } = require('child_process');
+exec('node /script.ts', (error, stdout) => {
+  console.log('out:', stdout.trim());
+});
+      `;
+      runtime.execute(code, '/test.js');
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      expect(consoleOutput.some(o => o.includes('TYPED HELLO'))).toBe(true);
+    });
+
+    it('should resolve `node script` to script.ts', async () => {
+      vfs.writeFileSync('/main.ts', `console.log('answer:' + (42 as number));`);
+
+      const code = `
+const { exec } = require('child_process');
+exec('node /main', (error, stdout) => {
+  console.log('out:', stdout.trim());
+});
+      `;
+      runtime.execute(code, '/test.js');
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      expect(consoleOutput.some(o => o.includes('answer:42'))).toBe(true);
+    });
+  });
+
   describe('shell features', () => {
     it('should support pipes', async () => {
       const code = `

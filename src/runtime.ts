@@ -54,6 +54,12 @@ import * as diagnosticsChannelShim from './shims/diagnostics_channel';
 import assertShim from './shims/assert';
 import { resolve as resolveExports, imports as resolveImports } from 'resolve.exports';
 import { transformEsmToCjsSimple } from './frameworks/code-transforms';
+import {
+  isTypeScriptFile,
+  isCommonJsTypeScriptFile,
+  stripTypeScriptTypes,
+  TS_RESOLVE_EXTENSIONS,
+} from './frameworks/strip-types';
 import * as acorn from 'acorn';
 
 /**
@@ -505,16 +511,18 @@ function createRequire(
           resolutionCache.set(cacheKey, resolved);
           return resolved;
         }
-        // Directory - look for index.js
-        const indexPath = pathShim.join(resolved, 'index.js');
-        if (vfs.existsSync(indexPath)) {
-          resolutionCache.set(cacheKey, indexPath);
-          return indexPath;
+        // Directory - look for index.{js,json,ts,...}
+        for (const indexExt of ['.js', '.json', ...TS_RESOLVE_EXTENSIONS]) {
+          const indexPath = pathShim.join(resolved, 'index' + indexExt);
+          if (vfs.existsSync(indexPath)) {
+            resolutionCache.set(cacheKey, indexPath);
+            return indexPath;
+          }
         }
       }
 
       // Try with extensions
-      const extensions = ['.js', '.json'];
+      const extensions = ['.js', '.json', ...TS_RESOLVE_EXTENSIONS];
       for (const ext of extensions) {
         const withExt = resolved + ext;
         if (vfs.existsSync(withExt)) {
@@ -535,15 +543,17 @@ function createRequire(
         if (stats.isFile()) {
           return basePath;
         }
-        // Directory - look for index.js
-        const indexPath = pathShim.join(basePath, 'index.js');
-        if (vfs.existsSync(indexPath)) {
-          return indexPath;
+        // Directory - look for index.{js,json,ts,...}
+        for (const indexExt of ['.js', '.json', ...TS_RESOLVE_EXTENSIONS]) {
+          const indexPath = pathShim.join(basePath, 'index' + indexExt);
+          if (vfs.existsSync(indexPath)) {
+            return indexPath;
+          }
         }
       }
 
       // Try with extensions
-      const extensions = ['.js', '.json', '.node'];
+      const extensions = ['.js', '.json', '.node', ...TS_RESOLVE_EXTENSIONS];
       for (const ext of extensions) {
         const withExt = basePath + ext;
         if (vfs.existsSync(withExt)) {
@@ -719,10 +729,17 @@ function createRequire(
         code = code.slice(code.indexOf('\n') + 1);
       }
 
+      // Strip TypeScript types first (mirrors Node's native .ts support).
+      // Whitespace-preserving, so the result still parses as plain JS.
+      if (isTypeScriptFile(resolvedPath)) {
+        code = stripTypeScriptTypes(code, resolvedPath);
+      }
+
       // Transform ESM to CJS if needed (for .mjs files or ESM that wasn't pre-transformed)
       // transformEsmToCjs uses AST to handle import/export, import.meta, and dynamic imports
       // It also handles already-CJS files safely (AST finds no ESM nodes → no-op)
-      if (!resolvedPath.endsWith('.cjs')) {
+      // .cjs and .cts are CommonJS — skip the ESM transform.
+      if (!resolvedPath.endsWith('.cjs') && !isCommonJsTypeScriptFile(resolvedPath)) {
         code = transformEsmToCjs(code, resolvedPath);
       }
 
@@ -1282,8 +1299,14 @@ export class Runtime {
       code = code.slice(code.indexOf('\n') + 1);
     }
 
+    // Strip TypeScript types first (mirrors Node's native .ts support).
+    if (isTypeScriptFile(filename)) {
+      code = stripTypeScriptTypes(code, filename);
+    }
+
     // Transform ESM to CJS if needed (AST-based, handles import.meta and dynamic imports too)
-    if (!filename.endsWith('.cjs')) {
+    // .cjs and .cts are CommonJS — skip the ESM transform.
+    if (!filename.endsWith('.cjs') && !isCommonJsTypeScriptFile(filename)) {
       code = transformEsmToCjs(code, filename);
     }
 

@@ -22,7 +22,7 @@ Built by the creators of [Macaly.com](https://macaly.com) — a tool that lets a
 - **Run Any CLI Tool** - npm packages with `bin` entries (vitest, eslint, tsc, etc.) work automatically
 - **Dev Servers** - Built-in Vite and Next.js development servers
 - **Hot Module Replacement** - React Refresh support for instant updates
-- **TypeScript Support** - First-class TypeScript/TSX transformation via esbuild-wasm
+- **TypeScript Support** - Run `.ts`/`.mts`/`.cts` files directly via Node-style type-stripping (synchronous, pure-JS); first-class TypeScript/TSX transformation in dev servers via esbuild-wasm
 - **Service Worker Architecture** - Intercepts requests for seamless dev experience
 - **Optional Web Worker Support** - Offload code execution to a Web Worker for improved UI responsiveness
 - **Secure by Default** - Cross-origin sandbox support for running untrusted code safely

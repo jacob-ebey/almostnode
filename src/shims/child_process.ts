@@ -124,12 +124,24 @@ export function initChildProcess(vfs: VirtualFS): void {
     }
 
     // Resolve the script path
-    const resolvedPath = scriptPath.startsWith('/')
+    const basePath = scriptPath.startsWith('/')
       ? scriptPath
       : `${ctx.cwd}/${scriptPath}`.replace(/\/+/g, '/');
 
+    // Try the exact path, then common extensions (mirrors `node app` resolving app.ts)
+    let resolvedPath = basePath;
+    if (!currentVfs.existsSync(resolvedPath) || currentVfs.statSync(resolvedPath).isDirectory()) {
+      const candidates = [
+        ...['.js', '.cjs', '.mjs', '.ts', '.mts', '.cts'].map(ext => basePath + ext),
+        ...['index.js', 'index.ts', 'index.mts', 'index.cts'].map(
+          name => `${basePath}/${name}`.replace(/\/+/g, '/')
+        ),
+      ];
+      resolvedPath = candidates.find(p => currentVfs!.existsSync(p)) ?? basePath;
+    }
+
     if (!currentVfs.existsSync(resolvedPath)) {
-      return { stdout: '', stderr: `Error: Cannot find module '${resolvedPath}'\n`, exitCode: 1 };
+      return { stdout: '', stderr: `Error: Cannot find module '${basePath}'\n`, exitCode: 1 };
     }
 
     let stdout = '';

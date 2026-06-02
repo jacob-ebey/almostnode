@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-06-01
+
+### Added
+- **Native TypeScript support**: `.ts`, `.mts`, and `.cts` files now run directly through the runtime, mirroring Node.js's native type-stripping (stable since Node 23.6). `node app.ts`, `require('./mod.ts')`, and `index.ts` directory resolution all work out of the box.
+  - Implemented with `acorn-typescript`, a pure-JS acorn plugin — no `typescript` compiler dependency and no wasm, so stripping is synchronous (required for `require()`) and adds minimal bundle weight.
+  - Type-only syntax (annotations, interfaces, type aliases, generics, `import type`/`export type`, `as`/`satisfies`, non-null `!`, definite assignment, `declare`, class member modifiers, `implements`) is replaced with whitespace, preserving source positions.
+  - `.cts` is treated as CommonJS and `.mts`/`.ts` as ESM-capable, consistent with Node.
+  - Like Node's strip-only mode, constructs requiring code generation (enums, namespaces, parameter-property assignment) are not emitted.
+
 ## [0.2.14] - 2026-02-14
 
 ### Added
