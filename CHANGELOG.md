@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-06-09
+
+### Changed
+- **TypeScript transform now uses `sucrase`** instead of the hand-rolled `acorn-typescript` type-stripper. Sucrase is a small (~1MB vs the ~24MB `typescript` compiler), pure-JS, synchronous transpiler with no Node built-ins, so it bundles cleanly for the browser and runs inside `require()`.
+  - Fixes syntax the strip-only approach could not emit: `enum`s now generate their runtime object, and constructor parameter properties (`constructor(private x: number)`) now generate the `this.x = x` assignments.
+  - The transform stays "TS → JS only": ES `import`/`export` are preserved so our ESM→CJS pass (`transformEsmToCjs`) still runs afterwards.
+  - `.tsx`: sucrase also compiles the JSX (it cannot keep raw JSX), driven by the resolved JSX config — so **custom JSX runtimes keep working** (Preact and others via `jsxImportSource`, or custom classic `jsxFactory`/`jsxFragmentFactory`). Plain `.jsx` still uses our `transformJsx` pass.
+  - Like Node's `--experimental-strip-types`, `namespace`s with runtime members are not emitted (use a real build step for those).
+  - `sucrase` added to `dependencies`; `acorn-typescript` and the runtime `typescript` dependency removed (`typescript` stays a devDependency for type-checking).
+
+### Fixed
+- ESM→CJS transform now appends a `;` after each rewritten import/export statement, fixing a syntax error when statements were emitted on a single line (e.g. `import ...;export ...`).
+
 ## [0.4.0] - 2026-06-01
 
 ### Added

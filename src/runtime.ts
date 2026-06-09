@@ -770,15 +770,19 @@ function createRequire(
         code = code.slice(code.indexOf('\n') + 1);
       }
 
-      // Strip TypeScript types first (mirrors Node's native .ts support).
-      // Whitespace-preserving, so the result still parses as plain JS. .tsx
-      // also goes through here so its TS syntax is removed before the JSX pass.
+      // Transform TypeScript → JS (keeps ESM for the ESM→CJS pass below).
+      // For .tsx, sucrase also compiles the JSX (it can't keep raw JSX), so we
+      // pass the resolved JSX config and skip the separate transformJsx pass.
       if (isTypeScriptFile(resolvedPath) || resolvedPath.endsWith('.tsx')) {
-        code = stripTypeScriptTypes(code, resolvedPath);
+        const jsxCfg = resolvedPath.endsWith('.tsx')
+          ? resolveJsxConfig(vfs, resolvedPath)
+          : undefined;
+        code = stripTypeScriptTypes(code, resolvedPath, jsxCfg);
       }
 
-      // Transform JSX (.jsx/.tsx) using the nearest tsconfig/jsconfig config.
-      if (isJsxFile(resolvedPath)) {
+      // Transform JSX for plain .jsx (no TypeScript) using the nearest config.
+      // (.tsx JSX was already handled by the TypeScript step above.)
+      if (resolvedPath.endsWith('.jsx')) {
         code = transformJsx(code, resolveJsxConfig(vfs, resolvedPath));
       }
 
@@ -1349,14 +1353,19 @@ export class Runtime {
       code = code.slice(code.indexOf('\n') + 1);
     }
 
-    // Strip TypeScript types first (mirrors Node's native .ts support).
-    // .tsx also passes through here to remove TS syntax before the JSX pass.
+    // Transform TypeScript → JS (keeps ESM for the ESM→CJS pass below).
+    // For .tsx, sucrase also compiles the JSX, so we pass the resolved JSX
+    // config and skip the separate transformJsx pass.
     if (isTypeScriptFile(filename) || filename.endsWith('.tsx')) {
-      code = stripTypeScriptTypes(code, filename);
+      const jsxCfg = filename.endsWith('.tsx')
+        ? resolveJsxConfig(this.vfs, filename)
+        : undefined;
+      code = stripTypeScriptTypes(code, filename, jsxCfg);
     }
 
-    // Transform JSX (.jsx/.tsx) using the nearest tsconfig/jsconfig config.
-    if (isJsxFile(filename)) {
+    // Transform JSX for plain .jsx (no TypeScript) using the nearest config.
+    // (.tsx JSX was already handled by the TypeScript step above.)
+    if (filename.endsWith('.jsx')) {
       code = transformJsx(code, resolveJsxConfig(this.vfs, filename));
     }
 

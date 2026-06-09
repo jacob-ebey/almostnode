@@ -484,11 +484,16 @@ function transformEsmToCjsAst(code: string): string {
     }
   }
 
-  // Apply replacements from end to start to preserve positions
+  // Apply replacements from end to start to preserve positions.
+  // Each replacement spans a full statement (acorn includes the trailing `;`
+  // in node.end, so it is consumed), and the original separator may have been
+  // just a `;` with no newline (e.g. sucrase emits `import ...;export ...` on a
+  // single line). Append a `;` so adjacent rewritten statements stay separated;
+  // a redundant `;` is a harmless empty statement.
   let result = code;
   replacements.sort((a, b) => b[0] - a[0]);
   for (const [start, end, replacement] of replacements) {
-    result = result.slice(0, start) + replacement + result.slice(end);
+    result = result.slice(0, start) + replacement + ';' + result.slice(end);
   }
 
   return result;

@@ -146,6 +146,48 @@ describe('Running .jsx/.tsx files through the runtime', () => {
     expect(exports.props.children).toEqual(['hello ', 'world']);
   });
 
+  it('runs a .tsx file with a custom automatic runtime (Preact via jsxImportSource)', () => {
+    vfs.writeFileSync(
+      '/tsconfig.json',
+      '{ "compilerOptions": { "jsx": "react-jsx", "jsxImportSource": "preact" } }'
+    );
+    vfs.writeFileSync(
+      '/node_modules/preact/jsx-runtime.js',
+      `const h = (type, props) => ({ runtime: 'preact', type, props });
+       exports.Fragment = 'PreactFragment';
+       exports.jsx = h;
+       exports.jsxs = h;`
+    );
+    vfs.writeFileSync(
+      '/app.tsx',
+      `const label: string = 'hi';
+       const el = <span title={label}>x</span>;
+       module.exports = el;`
+    );
+    const { exports } = runtime.runFile('/app.tsx') as { exports: any };
+    expect(exports.runtime).toBe('preact');
+    expect(exports.type).toBe('span');
+    expect(exports.props.title).toBe('hi');
+  });
+
+  it('runs a .tsx file with a custom classic factory (Preact h/Fragment)', () => {
+    vfs.writeFileSync(
+      '/tsconfig.json',
+      '{ "compilerOptions": { "jsx": "react", "jsxFactory": "h", "jsxFragmentFactory": "Fragment" } }'
+    );
+    vfs.writeFileSync(
+      '/app.tsx',
+      `const h = (type, props, ...children) => ({ runtime: 'preact-classic', type, props, children });
+       const Fragment = 'PF';
+       const x: number = 2;
+       module.exports = <div data-x={x}>a</div>;`
+    );
+    const { exports } = runtime.runFile('/app.tsx') as { exports: any };
+    expect(exports.runtime).toBe('preact-classic');
+    expect(exports.type).toBe('div');
+    expect(exports.props['data-x']).toBe(2);
+  });
+
   it('runs a .jsx file with the classic runtime when configured', () => {
     vfs.writeFileSync('/tsconfig.json', '{ "compilerOptions": { "jsx": "react" } }');
     vfs.writeFileSync(

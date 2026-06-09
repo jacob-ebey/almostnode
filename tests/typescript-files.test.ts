@@ -110,6 +110,30 @@ describe('TypeScript (.ts/.mts/.cts) support', () => {
     expect(exports).toBe(42);
   });
 
+  it('emits enums as runtime objects', () => {
+    vfs.writeFileSync(
+      '/enum.ts',
+      `enum Direction { Up, Down, Left, Right }
+       const d: Direction = Direction.Down;
+       module.exports = { value: d, name: Direction[d] };`
+    );
+    const { exports } = runtime.runFile('/enum.ts');
+    expect(exports).toEqual({ value: 1, name: 'Down' });
+  });
+
+  it('emits constructor parameter properties', () => {
+    vfs.writeFileSync(
+      '/params.ts',
+      `class Point {
+         constructor(private x: number, readonly y: number) {}
+         sum(): number { return this.x + this.y; }
+       }
+       module.exports = new Point(40, 2).sum();`
+    );
+    const { exports } = runtime.runFile('/params.ts');
+    expect(exports).toBe(42);
+  });
+
   it('treats .mts as ESM', () => {
     vfs.writeFileSync('/dep.mts', `export const n: number = 3;`);
     vfs.writeFileSync(
